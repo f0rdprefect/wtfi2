@@ -78,6 +78,61 @@ cd wtfi2
 cargo install --path .
 ```
 
+### Nix / NixOS
+
+The repo ships a flake, so you can run it without installing anything:
+
+```bash
+nix run github:kanywst/wtfi2          # one-shot report
+nix run github:kanywst/wtfi2 -- -w    # live dashboard
+```
+
+A development shell with the toolchain and the network tools wtfi shells out to
+(`ip`, `iw`, `ping`, `traceroute`):
+
+```bash
+nix develop
+cargo run -- -w
+```
+
+To install it into a flake-based NixOS system, add the flake as an input and
+pull in the overlay it exposes:
+
+```nix
+# flake.nix
+inputs.wtfi2.url = "github:kanywst/wtfi2";
+```
+
+```nix
+# configuration.nix
+{ inputs, pkgs, ... }:
+{
+  nixpkgs.overlays = [ inputs.wtfi2.overlays.default ];
+  environment.systemPackages = [ pkgs.wtfi2 ];
+}
+```
+
+`inputs.wtfi2.nixosModules.default` wires up the same overlay for you if you
+prefer `imports = [ inputs.wtfi2.nixosModules.default ];`. The Linux package
+wraps `wtfi` so `ip`, `iw`, `ping` and `traceroute` are on its `PATH`, since a
+stock NixOS install does not put any of them there.
+
+#### Keeping the flake in sync with `Cargo.lock`
+
+`flake.nix` pins the whole crate graph as a single `cargoHash`. Whenever
+`Cargo.lock` changes — a dependency bump, `cargo update`, a Dependabot PR — that
+hash goes stale and `nix build` fails with a `hash mismatch`. Nix prints the
+correct value on that first failing build, so the loop is:
+
+1. Set `cargoHash = lib.fakeHash;` in `flake.nix`.
+2. `git add flake.nix Cargo.lock` — flakes ignore files Git does not track.
+3. `nix build .#wtfi2` — it fails, reporting `got: sha256-…` for the vendored
+   dependencies.
+4. Paste that hash back into `cargoHash` and `nix build .#wtfi2` again.
+
+`nix flake update` only refreshes the `nixpkgs` input; it does not touch
+`cargoHash`.
+
 The installed command is `wtfi` in every case. The crate builds anywhere but only *diagnoses* on macOS and Linux — see [Platform support](#platform-support).
 
 ## Usage
