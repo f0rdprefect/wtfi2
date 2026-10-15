@@ -120,9 +120,9 @@ outputs = { nixpkgs, ... }@inputs: {
 ```
 
 `inputs.wtfi2.nixosModules.default` wires up the same overlay for you if you
-prefer `imports = [ inputs.wtfi2.nixosModules.default ];`. The Linux package
-wraps `wtfi` so `ip`, `iw`, `ping` and `traceroute` are on its `PATH`, since a
-stock NixOS install does not put any of them there.
+prefer `imports = [ inputs.wtfi2.nixosModules.default ];`. On Linux the package
+falls back to its own `ip`, `iw`, `ping` and `traceroute` when the system has
+none.
 
 The installed command is `wtfi` in every case. The crate builds anywhere but only *diagnoses* on macOS and Linux — see [Platform support](#platform-support).
 

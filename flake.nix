@@ -20,8 +20,8 @@
       description = "Live, visual network-path diagnostic that pinpoints exactly where your connection dies";
 
       # Linux shells out to these at runtime (ip/iw for link telemetry, ping and
-      # traceroute for the probes). None are guaranteed by a stock NixOS install,
-      # so the wrapper below puts them on the binary's PATH.
+      # traceroute for the probes). Appended to PATH, not prepended: a distro's
+      # own ping carries cap_net_raw, the store copy does not.
       runtimeTools =
         pkgs: with pkgs; [
           iproute2
@@ -35,14 +35,22 @@
         pkgs.rustPlatform.buildRustPackage {
           pname = "wtfi2";
           inherit version;
-          src = self;
+          src = lib.fileset.toSource {
+            root = ./.;
+            fileset = lib.fileset.unions [
+              ./Cargo.toml
+              ./Cargo.lock
+              ./src
+              ./tests
+            ];
+          };
           cargoLock.lockFile = ./Cargo.lock;
 
           nativeBuildInputs = lib.optionals pkgs.stdenv.hostPlatform.isLinux [ pkgs.makeWrapper ];
 
           postInstall = lib.optionalString pkgs.stdenv.hostPlatform.isLinux ''
             wrapProgram $out/bin/wtfi \
-              --prefix PATH : ${lib.makeBinPath (runtimeTools pkgs)}
+              --suffix PATH : ${lib.makeBinPath (runtimeTools pkgs)}
           '';
 
           meta = {
