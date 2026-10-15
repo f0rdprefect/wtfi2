@@ -101,6 +101,13 @@ pull in the overlay it exposes:
 ```nix
 # flake.nix
 inputs.wtfi2.url = "github:kanywst/wtfi2";
+
+outputs = { nixpkgs, ... }@inputs: {
+  nixosConfigurations.<host> = nixpkgs.lib.nixosSystem {
+    specialArgs = { inherit inputs; };
+    modules = [ ./configuration.nix ];
+  };
+};
 ```
 
 ```nix

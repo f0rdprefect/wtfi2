@@ -36,6 +36,7 @@
         pkgs.rustPlatform.buildRustPackage {
           pname = "wtfi2";
           inherit version;
+          cargoDepsName = "wtfi2";
           src = self;
 
           # Fixed-output pin of the Cargo.lock graph. Regenerate with the fakeHash
