@@ -422,8 +422,12 @@ pub async fn run_once() -> Path {
 /// left `Pending`, so a truncated sweep can't render as "Scanning your
 /// connection…" in a report that has already stopped scanning.
 pub async fn run_once_within(deadline: Duration) -> Path {
+    settle_within(spawn(), deadline).await
+}
+
+/// Split out so tests can drive it without the real probes.
+async fn settle_within(mut rx: mpsc::UnboundedReceiver<Hop>, deadline: Duration) -> Path {
     let mut path = skeleton();
-    let mut rx = spawn();
     let sleep = tokio::time::sleep(deadline);
     tokio::pin!(sleep);
     loop {
@@ -463,13 +467,19 @@ mod tests {
         );
     }
 
+    /// No real probes: on a host with no network one can `Fail` inside 1ms.
+    async fn a_silent_sweep_cut_short() -> Path {
+        let (_tx, rx) = mpsc::unbounded_channel();
+        settle_within(rx, Duration::from_millis(1)).await
+    }
+
     /// A sweep that gets cut short must still hand back a path whose every hop
     /// has settled. A leftover `Pending` renders as "Scanning your
     /// connection…" in a report that has already stopped scanning, and leaves
     /// the live dashboard waiting on a hop that is never coming.
     #[tokio::test]
     async fn a_truncated_sweep_still_settles_every_hop() {
-        let path = run_once_within(Duration::from_millis(1)).await;
+        let path = a_silent_sweep_cut_short().await;
         let unsettled: Vec<_> = path
             .hops
             .iter()
@@ -482,14 +492,33 @@ mod tests {
     /// And what it hands back must say the hops were *unmeasured*, not graded.
     #[tokio::test]
     async fn a_truncated_sweep_reports_the_gap_rather_than_a_verdict() {
-        let path = run_once_within(Duration::from_millis(1)).await;
+        let path = a_silent_sweep_cut_short().await;
         assert!(
-            path.hops.iter().any(|h| h.fault == Some(Fault::Unobserved)),
-            "a sweep this short cannot have measured anything"
+            path.hops.iter().all(|h| h.fault == Some(Fault::Unobserved)),
+            "nothing reported, so every hop is unmeasured"
         );
         assert!(
             !path.hops.iter().any(|h| h.status == Status::Fail),
             "nothing was observed, so nothing may be called broken"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_truncated_sweep_keeps_the_hops_that_reported() {
+        let (tx, rx) = mpsc::unbounded_channel();
+        let mut host = host_hop();
+        host.status = Status::Fail;
+        tx.send(host).unwrap();
+        let path = settle_within(rx, Duration::from_millis(50)).await;
+        drop(tx);
+        let host = path.hops.iter().find(|h| h.id == HopId::Host).unwrap();
+        assert_eq!(host.status, Status::Fail);
+        assert_eq!(host.fault, None);
+        assert!(
+            path.hops
+                .iter()
+                .filter(|h| h.id != HopId::Host)
+                .all(|h| h.fault == Some(Fault::Unobserved))
         );
     }
 }
