@@ -36,17 +36,8 @@
         pkgs.rustPlatform.buildRustPackage {
           pname = "wtfi2";
           inherit version;
-          cargoDepsName = "wtfi2";
           src = self;
-
-          # Fixed-output pin of the Cargo.lock graph. Regenerate with the fakeHash
-          # trick after any dependency change — see "Keeping the flake in sync with
-          # Cargo.lock" in README.md.
-          cargoHash = "sha256-QURJm65pr3empV8tK5jEBbmp7Uo9XoD89yulflRa8+8=";
-
-          # tests/cli.rs drives the real binary against the live network; the
-          # sandbox has none, so the network leg is not meaningful there.
-          doCheck = false;
+          cargoLock.lockFile = ./Cargo.lock;
 
           nativeBuildInputs = lib.optionals pkgs.stdenv.hostPlatform.isLinux [ pkgs.makeWrapper ];
 
