@@ -103,7 +103,7 @@ pull in the overlay it exposes:
 inputs.wtfi2.url = "github:kanywst/wtfi2";
 
 outputs = { nixpkgs, ... }@inputs: {
-  nixosConfigurations.<host> = nixpkgs.lib.nixosSystem {
+  nixosConfigurations.myhost = nixpkgs.lib.nixosSystem {
     specialArgs = { inherit inputs; };
     modules = [ ./configuration.nix ];
   };
